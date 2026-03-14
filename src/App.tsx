@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from './supabase';
 import { Bot, License, UserProfile } from './types';
 import { User } from '@supabase/supabase-js';
@@ -183,17 +183,47 @@ export default function App() {
     imageUrl: ''
   });
 
-  const handleLogin = async () => {
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [authForm, setAuthForm] = useState({ email: '', password: '' });
+  const [authError, setAuthError] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+
+  const handleAuthSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError('');
+    setAuthLoading(true);
+
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-      });
-      if (error) throw error;
-    } catch (error) {
-      console.error('Login error:', error);
+      if (authMode === 'register') {
+        const { error } = await supabase.auth.signUp({
+          email: authForm.email,
+          password: authForm.password,
+        });
+        if (error) throw error;
+        // Supabase might require email confirmation depending on settings
+        setAuthError('Verifique seu e-mail para confirmar o cadastro (se necessário pelo Supabase), ou tente fazer login.');
+        setAuthMode('login');
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({
+          email: authForm.email,
+          password: authForm.password,
+        });
+        if (error) throw error;
+        setIsAuthModalOpen(false);
+        setAuthForm({ email: '', password: '' });
+      }
+    } catch (error: any) {
+      setAuthError(error.message || 'Erro na autenticação.');
+    } finally {
+      setAuthLoading(false);
     }
   };
 
+  const handleLogin = () => {
+    setIsAuthModalOpen(true);
+    setAuthMode('login');
+  };
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setView('catalog');
@@ -631,157 +661,3 @@ export default function App() {
                     <div className="space-y-2 md:col-span-2">
                       <label className="text-xs font-black uppercase text-gray-500">URL da Imagem de Capa</label>
                       <input 
-                        type="text" 
-                        placeholder="https://exemplo.com/imagem.png"
-                        className="w-full bg-black border border-zinc-800 rounded-xl px-4 py-3 focus:border-red-600 outline-none transition-colors"
-                        value={newBot.imageUrl}
-                        onChange={e => setNewBot({...newBot, imageUrl: e.target.value})}
-                      />
-                    </div>
-                    <div className="space-y-2 md:col-span-2">
-                      <label className="text-xs font-black uppercase text-gray-500">Vantagens (separadas por vírgula)</label>
-                      <input 
-                        type="text" 
-                        placeholder="Auto-mod, Economia, Tickets"
-                        className="w-full bg-black border border-zinc-800 rounded-xl px-4 py-3 focus:border-red-600 outline-none transition-colors"
-                        onChange={e => setNewBot({...newBot, features: e.target.value.split(',').map(s => s.trim())})}
-                      />
-                    </div>
-                    <div className="flex gap-4 md:col-span-2">
-                      <button type="submit" className="flex-1 bg-red-600 text-black font-black uppercase py-4 rounded-xl hover:bg-red-700 transition-all">Salvar Bot</button>
-                      <button type="button" onClick={() => setIsAdminFormOpen(false)} className="px-8 bg-zinc-800 text-white font-black uppercase py-4 rounded-xl hover:bg-zinc-700 transition-all">Cancelar</button>
-                    </div>
-                  </form>
-                </motion.div>
-              )}
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800">
-                  <p className="text-gray-500 text-xs uppercase font-black">Total Bots</p>
-                  <p className="text-4xl font-black mt-2">{bots.length}</p>
-                </div>
-                <div className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800">
-                  <p className="text-gray-500 text-xs uppercase font-black">Licenças Ativas</p>
-                  <p className="text-4xl font-black mt-2 text-emerald-500">{licenses.filter(l => l.status === 'active').length}</p>
-                </div>
-                <div className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800">
-                  <p className="text-gray-500 text-xs uppercase font-black">Licenças Expiradas</p>
-                  <p className="text-4xl font-black mt-2 text-red-600">{licenses.filter(l => l.status === 'expired').length}</p>
-                </div>
-              </div>
-
-              <div className="bg-zinc-900 rounded-2xl border border-zinc-800 overflow-hidden">
-                <div className="p-6 border-b border-zinc-800">
-                  <h3 className="font-bold uppercase tracking-widest text-sm">Gerenciar Bots</h3>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left">
-                    <thead className="bg-black/50 text-xs uppercase font-black text-gray-500">
-                      <tr>
-                        <th className="px-6 py-4">Nome</th>
-                        <th className="px-6 py-4">Preço</th>
-                        <th className="px-6 py-4">Ações</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-800">
-                      {bots.map(bot => (
-                        <tr key={bot.id} className="hover:bg-white/5 transition-colors">
-                          <td className="px-6 py-4 font-bold">{bot.name}</td>
-                          <td className="px-6 py-4 text-red-600 font-mono">R$ {bot.price.toFixed(2)}</td>
-                          <td className="px-6 py-4">
-                            <button className="text-gray-500 hover:text-red-600 transition-colors">
-                              <Trash2 className="w-5 h-5" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </main>
-
-      {/* Payment Modal */}
-      <AnimatePresence>
-        {isPaymentModalOpen && selectedBot && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsPaymentModalOpen(false)}
-              className="absolute inset-0 bg-black/90 backdrop-blur-sm"
-            />
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative bg-zinc-950 border border-red-600/30 w-full max-w-lg cyber-border overflow-hidden shadow-[0_0_100px_rgba(220,38,38,0.3)]"
-            >
-              <div className="tech-scan" />
-              <div className="p-10 space-y-10">
-                <div className="text-center space-y-3">
-                  <div className="flex justify-center mb-4">
-                    <div className="w-16 h-16 bg-red-600/10 border border-red-600 cyber-border flex items-center justify-center">
-                      <Zap className="text-red-600 w-8 h-8" />
-                    </div>
-                  </div>
-                  <h3 className="text-3xl font-black uppercase italic tracking-tighter glitch-text">Protocolo de <span className="text-red-600">Acesso</span></h3>
-                  <p className="text-zinc-500 font-mono text-[10px] uppercase tracking-widest">Autorizando Transação de Criptografia</p>
-                </div>
-
-                <div className="bg-black border border-zinc-800 p-8 cyber-border space-y-6">
-                  <div className="flex justify-between items-center">
-                    <span className="text-zinc-600 uppercase text-[10px] font-mono font-black tracking-widest">Unidade_Bot</span>
-                    <span className="font-black text-white uppercase italic">{selectedBot.name}</span>
-                  </div>
-                  <div className="h-px bg-zinc-900" />
-                  <div className="flex justify-between items-center">
-                    <span className="text-zinc-600 uppercase text-[10px] font-mono font-black tracking-widest">Valor_do_Contrato</span>
-                    <span className="text-3xl font-black text-red-600 italic">R$ {selectedBot.price.toFixed(2)}</span>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <p className="text-center text-[10px] uppercase font-mono font-black text-zinc-600 tracking-[0.3em]">Selecione Gateway</p>
-                  <div className="grid grid-cols-2 gap-4">
-                    <button className="border border-red-600 bg-red-600/5 p-5 cyber-border flex flex-col items-center gap-3 transition-all hover:bg-red-600/10 group/gate">
-                      <div className="w-10 h-10 bg-red-600 cyber-border flex items-center justify-center text-black font-black group-hover/gate:scale-110 transition-transform">PIX</div>
-                      <span className="text-[10px] font-mono font-black uppercase tracking-widest">Rede_Instantânea</span>
-                    </button>
-                    <button className="border border-zinc-800 p-5 cyber-border flex flex-col items-center gap-3 opacity-30 cursor-not-allowed grayscale">
-                      <div className="w-10 h-10 bg-zinc-800 cyber-border flex items-center justify-center text-zinc-500 font-black">CC</div>
-                      <span className="text-[10px] font-mono font-black uppercase tracking-widest">Cripto_Card</span>
-                    </button>
-                  </div>
-                </div>
-
-                <button 
-                  onClick={confirmPurchase}
-                  className="w-full bg-red-600 hover:bg-red-700 text-black py-6 cyber-border font-black uppercase text-sm tracking-[0.3em] transition-all shadow-2xl shadow-red-600/40 active:scale-95 flex items-center justify-center gap-3"
-                >
-                  Confirmar Autenticação
-                  <ShieldCheck className="w-5 h-5" />
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Footer */}
-      <footer className="border-t border-zinc-900 py-12 mt-20">
-        <div className="max-w-7xl mx-auto px-4 text-center space-y-4">
-          <div className="flex items-center justify-center gap-2 opacity-50">
-            <ShieldCheck className="w-5 h-5 text-red-600" />
-            <span className="text-sm font-black uppercase tracking-tighter italic">Buldogue Store</span>
-          </div>
-          <p className="text-xs text-gray-600 uppercase tracking-[0.2em]">© 2026 Buldogue Store. Todos os direitos reservados.</p>
-        </div>
-      </footer>
-    </div>
-  );
-}
