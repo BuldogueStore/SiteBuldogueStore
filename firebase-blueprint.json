@@ -1,0 +1,55 @@
+{
+  "entities": {
+    "Bot": {
+      "title": "Bot",
+      "description": "Um bot disponível para compra no catálogo.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Nome do bot" },
+        "description": { "type": "string", "description": "Descrição detalhada" },
+        "price": { "type": "number", "description": "Preço mensal em reais" },
+        "features": { "type": "array", "items": { "type": "string" }, "description": "Lista de funcionalidades" },
+        "imageUrl": { "type": "string", "description": "URL da imagem do bot" }
+      },
+      "required": ["name", "description", "price"]
+    },
+    "License": {
+      "title": "License",
+      "description": "Uma licença de uso de um bot vinculada a um usuário.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "ID do usuário proprietário" },
+        "botId": { "type": "string", "description": "ID do bot licenciado" },
+        "botName": { "type": "string", "description": "Nome do bot (denormalizado)" },
+        "licenseKey": { "type": "string", "description": "Chave de licença única" },
+        "expiresAt": { "type": "string", "format": "date-time", "description": "Data de expiração" },
+        "status": { "type": "string", "enum": ["active", "expired"], "description": "Status da licença" }
+      },
+      "required": ["userId", "botId", "licenseKey", "expiresAt", "status"]
+    },
+    "User": {
+      "title": "User",
+      "description": "Perfil do usuário na loja.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "description": "E-mail do usuário" },
+        "role": { "type": "string", "enum": ["admin", "customer"], "description": "Papel do usuário" }
+      },
+      "required": ["email", "role"]
+    }
+  },
+  "firestore": {
+    "bots": {
+      "schema": "Bot",
+      "description": "Catálogo de bots disponíveis."
+    },
+    "licenses": {
+      "schema": "License",
+      "description": "Licenças adquiridas pelos usuários."
+    },
+    "users": {
+      "schema": "User",
+      "description": "Dados dos usuários cadastrados."
+    }
+  }
+}

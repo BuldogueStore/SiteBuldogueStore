@@ -1,0 +1,94 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: bots
+    // Fields:
+    //   - name: string (required)
+    //   - description: string (required)
+    //   - price: number (required)
+    //   - features: list (optional)
+    //   - imageUrl: string (optional)
+    //
+    // Collection: licenses
+    // Fields:
+    //   - userId: string (required)
+    //   - botId: string (required)
+    //   - botName: string (required)
+    //   - licenseKey: string (required)
+    //   - expiresAt: timestamp (required)
+    //   - status: string (required, ['active', 'expired'])
+    //
+    // Collection: users
+    // Fields:
+    //   - email: string (required)
+    //   - role: string (required, ['admin', 'customer'])
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "punisherjogador@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidBot(data) {
+      return data.keys().hasAll(['name', 'description', 'price']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.description is string && data.description.size() > 0 && data.description.size() < 2000 &&
+             data.price is number && data.price >= 0;
+    }
+
+    function isValidLicense(data) {
+      return data.keys().hasAll(['userId', 'botId', 'botName', 'licenseKey', 'expiresAt', 'status']) &&
+             data.userId is string &&
+             data.botId is string &&
+             data.botName is string &&
+             data.licenseKey is string &&
+             data.expiresAt is timestamp &&
+             data.status in ['active', 'expired'];
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['email', 'role']) &&
+             data.email is string &&
+             data.role in ['admin', 'customer'];
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /bots/{botId} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidBot(request.resource.data);
+    }
+
+    match /licenses/{licenseId} {
+      allow read: if isAuthenticated() && (isOwner(resource.data.userId) || isAdmin());
+      allow create: if isAuthenticated() && (isOwner(request.resource.data.userId) || isAdmin()) && isValidLicense(request.resource.data);
+      allow update: if isAuthenticated() && (isOwner(resource.data.userId) || isAdmin()) && isValidLicense(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isAuthenticated() && (isOwner(userId) || isAdmin()) && isValidUser(request.resource.data);
+    }
+  }
+}
